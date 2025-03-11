@@ -1,0 +1,11 @@
+*.pyc
+.vscode/*.*
+.idea
+venv
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+#Working folders
+test_folder
+logs
