@@ -4,6 +4,7 @@ Skrypt służy do przesyłania plików '.xml' przy pomocy interfejsu API i ich o
 
 Dla wszystkich plików o danym rozszerzeniu znajdujących się we wskazanej lokalizacji są podejmowane próby wysyłki na wskazany adres. W zalezności od statusu, pliki te se są segregowane na pliki wysłane poprawnie oraz niepoprawnie. Powód niepowodzenia wysyłki jest zapisywany w pliku .txt.
 Skrypt działa w sposób synchroniczny w celu minimalizacji obciążenia serwisów do autentykacji i uwierzytelniania oraz serwisu docelowego.
+Wysyłka plików wykonywana jest w kolejności alfabetycznej.
 
 ## Konfiguracja
 
@@ -13,7 +14,7 @@ Parametry:
 ```
 [General]
 scanning_mode = one-time / loop                                                                         # Tryb wykonywania skryptu - na żadanie lub ciągły.
-delay_in_seconds = 2                                                                                    # Opóźnienie pomiędzy obsługą poszczególnych plików w sekundach.
+delay_in_seconds = 2                                                                                    # Opóźnienie pomiędzy wylistowaniem a odczytem zawartości pliku. Należy zwiększyć jeżeli proces generacji pliku jest długi
 upload_endpoint = https://pwdpb.spsm-sr.pse.pl/pwdp/pwdp-api/oze/schedule-request-files                 # Endpoint do upload'u plików
 oauth2_endpoint = https://sduext-sso.spsm-sr.pse.pl/auth/realms/SDU-EXT/protocol/openid-connect/token   # Endpoint do uwierzytelniania i autentykacji przy pomocy żetonów JWT.
 
@@ -23,9 +24,11 @@ file_format = .xml                                                              
 user = nazwa.uzytkownika@pse.pl                                                                         # Login dla użytkownika wykorzystywanego w procesie.
 secret = jakieshaslo!                                                                                   # Hasło dla użytkownika wykorzystywanego w procesie.
 permission = 10368                                                                                      # Numer uprawnień dla użytkownika. Odpowiedni numer pozwala wykorzystać 'upload_endpoint'.
+email_username = jakis.mail@pse.pl                                                                      # Adres email skrzynki, z której pobierane mają być pliki do późniejszej obsługi w skrypcie
+email_password = jakieshaslodoemaila                                                                    # Hasło do podanego powyżej adresu email
 
 [Paths]
-source_path = C:/DEV/Projekty/PWDP/folder_z_xml                                                         # Ścieżka, w której znajdują się pliki '.xml' do wysłania.
+source_path = C:/DEV/Projekty/PWDP/folder_z_xml                                                         # Ścieżka, w której znajdują się pliki '.xml' do wysłania. Do tej lokalizacji zapisywane są załączniki do uploadu ze skrzynki email
 sent_dir_path = C:/DEV/Projekty/PWDP/folder_z_xml/sent                                                  # Ścieżka, w której przechowywane są pliki wysłane z powodzeniem.
 
 failed_dir_name = C:/DEV/Projekty/PWDP/folder_z_xml/failed                                              # Ścieżka, w której przechowywane są pliki których nie udało się przesłać. W folderze tym tworzone są również pliki informujące o błędach podczas próby wysłania.

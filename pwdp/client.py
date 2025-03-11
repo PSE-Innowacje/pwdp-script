@@ -90,6 +90,7 @@ class PWDPClient:
         files = glob.glob(pathname=f"*{file_format}", root_dir=self.source_path)
         if files:
             logger.info(f'Found files: {", ".join(files)}')
+        files.sort()
         return files
 
     @staticmethod
@@ -211,6 +212,7 @@ class PWDPClient:
         Uploads file. If it fails, refreshes RPT token and tries uploading again.
         If this also fails, raise UploadError.
         """
+        time.sleep(self.delay_in_seconds)
         response = self.upload_file(filename)
         if response.ok:
             logger.info(f"{filename} upload was successful.")
