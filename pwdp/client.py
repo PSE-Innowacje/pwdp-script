@@ -1,12 +1,15 @@
 import glob
+import io
 import logging
 import shutil
 import time
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Self
+from zipfile import BadZipFile, ZipFile
 
 import requests
+from exchangelib import DELEGATE, Account, Configuration, Credentials, FileAttachment
 
 from pwdp import config_loader
 
@@ -17,21 +20,36 @@ class UploadError(Exception):
     pass
 
 
+class ExchangeError(Exception):
+    pass
+
+
 class PWDPClient:
     def __init__(self, config: ConfigParser) -> None:
         # Extract data from Config
-        self.file_format = config["General"]["file_format"]
         self.source_path = Path(config["Paths"]["source_path"])
         self.sent_path = Path(config["Paths"]["sent_dir_path"])
         self.failed_path = Path(config["Paths"]["failed_dir_path"])
+
+        self.file_format = config["General"]["file_format"]
         self.scanning_mode = config["General"]["scanning_mode"]
         self.delay_in_seconds = int(config["General"]["delay_in_seconds"])
+        self.consecutive_runs_interval = int(
+            config["General"]["consecutive_runs_interval"]
+        )
         self.upload_endpoint = config["General"]["upload_endpoint"]
         self.oauth2_endpoint = config["General"]["oauth2_endpoint"]
+
         self.user = config["Credentials"]["user"]
         self.secret = config["Credentials"]["secret"]
         self.permission = config["Credentials"]["permission"]
-
+        self.email_username = config["Credentials"]["email_username"]
+        self.email_password = config["Credentials"]["email_password"]
+        proxy = config["Proxy"].get("proxy")
+        if proxy:
+            self.proxy = {"http": proxy, "https": proxy}
+        else:
+            self.proxy = None
         self.refresh_token_expiration_time = None
         self.access_token = None
         self.refresh_token = None
@@ -64,7 +82,7 @@ class PWDPClient:
         time_since_last_token_update = time.time()
         while True:
             self.run_once()
-            time.sleep(5)
+            time.sleep(self.consecutive_runs_interval)
             if self.check_token_expiration_time(time_since_last_token_update):
                 self.refresh_rpt_tokens()
                 time_since_last_token_update = time.time()
@@ -77,20 +95,110 @@ class PWDPClient:
         elif self.scanning_mode == "loop":
             self.run_continuously()
         else:
-            logger.error("Unknown 'scanning_mode' provided.")
+            logger.error(
+                "Unknown 'scanning_mode' provided. 'one-time' or 'loop' are vaild."
+            )
+
+    def _connect_to_email(self) -> Account:
+        credentials = Credentials(
+            username=self.email_username,
+            password=self.email_password,
+        )
+        config = Configuration(server="poczta.pse.pl", credentials=credentials)
+        account = Account(
+            primary_smtp_address=self.email_username,
+            config=config,
+            autodiscover=False,
+            access_type=DELEGATE,
+        )
+        return account
+
+    def fetch_attachments_to_upload(self, file_format: str, account: Account) -> None:
+        unread_mails = account.inbox.filter(is_read=False)
+        # Save attachments to local file system for future upload
+        for mail in unread_mails:
+            if mail.has_attachments:
+                logger.info(f"Found email '{mail.subject}' with attachments.")
+                for attachment in mail.attachments:
+                    # TODO - tar and tar.gz?
+                    if attachment.name.split(".")[-1].lower() == "zip":
+                        logger.info(
+                            f"Attachment '{attachment.name}' is probably an archive."
+                        )
+                        self.fetch_valid_files_from_archive_attachment(
+                            file_format, attachment
+                        )
+                    elif "." + attachment.name.split(".")[-1].lower() == file_format:
+                        with open(self.source_path / attachment.name, "wb") as f:
+                            f.write(attachment.content)
+                            logger.info(
+                                f"Successfuly saved attachment: {attachment.name} "
+                                "to local filesystem."
+                            )
+            # Mark email as read, delete it entirely and update account
+            mail.is_read = True
+            mail.save()
+            mail.delete()
+
+        logger.info(f"Finished fetching {file_format} files from Inbox.")
+
+    def fetch_valid_files_from_archive_attachment(
+        self, file_format: str, attachment: FileAttachment
+    ) -> None:
+        try:
+            archive_file = ZipFile(io.BytesIO(attachment.content))
+        except BadZipFile as e:
+            logger.error(f"{attachment.name} {e}")
+            return
+
+        if archive_file.testzip() is not None:
+            logger.error(
+                f"Archive attachment '{attachment.name}' "
+                "failed integrity test, skipping its parsing...."
+            )
+            return
+        logger.info(f"Attachment '{attachment.name}' seems to be vaild.")
+        for filename in archive_file.namelist():
+            if filename.endswith(file_format):
+                logger.info(f"Found {filename} in archive: {attachment.name}")
+                with open(self.source_path / filename, "wb") as f:
+                    f.write(archive_file.read(filename))
+                logger.info(f"Successfuly saved {filename} to local filesystem.")
 
     def scan_for_files(self, file_format: str | None = None) -> list[str]:
         """
         Scan for new files with given format.
         By default use one specified in config.
+        Sort output to ensure alphabetic processing.
         """
+        # Connect to email
+        try:
+            account = self._connect_to_email()
+            logger.info("Connected to EWS account.")
+        except ExchangeError as e:
+            logger.error(f"Error while connecting to Exchange account: {e}")
+            raise
+        # Refresh info about Account
+        try:
+            account.inbox.refresh()
+            logger.info("Refreshed Inbox.")
+        except ExchangeError as e:
+            logger.error(f"Unable to refresh Inbox - Unexpected error: {e}")
+            raise
+
         if file_format is None:
             file_format = self.file_format
+
+        try:
+            self.fetch_attachments_to_upload(file_format, account)
+        except ExchangeError as e:
+            logger.warning(f"Failed to fetch file(s) to upload: {e}")
 
         files = glob.glob(pathname=f"*{file_format}", root_dir=self.source_path)
         if files:
             logger.info(f'Found files: {", ".join(files)}')
-        files.sort()
+        else:
+            logger.info("No vaild files to upload.")
         return files
 
     @staticmethod
@@ -101,6 +209,14 @@ class PWDPClient:
         except requests.JSONDecodeError as e:
             logger.error(e)
             raise
+        if not response.ok:
+            error = r.get("error", "Not available")
+            error_description = r.get("error_description", "Not available")
+            logger.error(
+                f"Request failed with HTTP status: {response.status_code}. "
+                f"Reason: {error}. Details: {error_description}."
+            )
+
         # Try retrieving tokens from JSON
         try:
             access_token = r["access_token"]
@@ -122,7 +238,9 @@ class PWDPClient:
                 "username": self.user,
                 "password": self.secret,
             },
-            verify=False,
+            verify=True,
+            timeout=(5, 5),
+            proxies=self.proxy,
         )
         (
             access_token,
@@ -146,7 +264,9 @@ class PWDPClient:
                 "audience": "pwdp2",
                 "grant_type": "urn:ietf:params:oauth:grant-type:uma-ticket",
             },
-            verify=False,
+            verify=True,
+            timeout=(5, 5),
+            proxies=self.proxy,
         )
         (
             access_token,
@@ -182,7 +302,9 @@ class PWDPClient:
                 "Content-Type": "application/x-www-form-urlencoded",
                 "partnercode": self.permission,
             },
-            verify=False,
+            verify=True,
+            timeout=(5, 5),
+            proxies=self.proxy,
         )
         (
             access_token,
@@ -203,7 +325,9 @@ class PWDPClient:
                 "Authorization": "Bearer " + self.access_token,
             },
             files={"file": (filename, open(f"{self.source_path / filename}", "rb"))},
-            verify=False,
+            verify=True,
+            timeout=(100, 120),
+            proxies=self.proxy,
         )
         return response
 
@@ -212,7 +336,6 @@ class PWDPClient:
         Uploads file. If it fails, refreshes RPT token and tries uploading again.
         If this also fails, raise UploadError.
         """
-        time.sleep(self.delay_in_seconds)
         response = self.upload_file(filename)
         if response.ok:
             logger.info(f"{filename} upload was successful.")
@@ -221,7 +344,6 @@ class PWDPClient:
         logger.warning("File upload failed. Refreshing RPT token and retrying...")
         self.refresh_rpt_tokens()
         response = self.upload_file(filename)
-
         if response.ok:
             logger.info(f"{filename} upload was successful.")
             return
@@ -245,8 +367,6 @@ class PWDPClient:
                 logger.error(error)
                 self.write_error_file(filename, error)
                 self.move_file(filename, self.failed_path)
-            # Delay next upload to avoid server overload
-            time.sleep(self.delay_in_seconds)
 
     def write_error_file(self, filename: str, error: UploadError) -> None:
         error_filename = f"failed_{filename}.err"

@@ -12,7 +12,7 @@ def read_asset(asset_name: str, assets_anchor: str = DEFAULT_CONFIG_ANCHOR) -> b
 
 def load_config_from_ini(filename: str) -> ConfigParser:
     config_content = read_asset(filename)
-    config_parser = ConfigParser()
+    config_parser = ConfigParser(interpolation=None)
     config_parser.read_string(config_content.decode("utf-8"))
     return config_parser
 

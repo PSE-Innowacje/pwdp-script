@@ -1,1 +1,3 @@
+exchangelib
 pre-commit
+requests

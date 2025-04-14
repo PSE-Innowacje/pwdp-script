@@ -4,7 +4,7 @@ Skrypt służy do przesyłania plików '.xml' przy pomocy interfejsu API i ich o
 
 Dla wszystkich plików o danym rozszerzeniu znajdujących się we wskazanej lokalizacji są podejmowane próby wysyłki na wskazany adres. W zalezności od statusu, pliki te se są segregowane na pliki wysłane poprawnie oraz niepoprawnie. Powód niepowodzenia wysyłki jest zapisywany w pliku .txt.
 Skrypt działa w sposób synchroniczny w celu minimalizacji obciążenia serwisów do autentykacji i uwierzytelniania oraz serwisu docelowego.
-Wysyłka plików wykonywana jest w kolejności alfabetycznej.
+W trybie 'loop' - skrypt uruchamiany jest w odstępach czasowych, zdefiniowanych w parametrze konfiguracyjnym 'consecutive_runs_interval'.
 
 ## Konfiguracja
 
@@ -14,7 +14,8 @@ Parametry:
 ```
 [General]
 scanning_mode = one-time / loop                                                                         # Tryb wykonywania skryptu - na żadanie lub ciągły.
-delay_in_seconds = 2                                                                                    # Opóźnienie pomiędzy wylistowaniem a odczytem zawartości pliku. Należy zwiększyć jeżeli proces generacji pliku jest długi
+delay_in_seconds = 2                                                                                    # Opóźnienie pomiędzy obsługą poszczególnych plików w sekundach. Opóźnienie to ma na celu mitygację konfliktów podczas obsługi plików o większych rozmiarach.
+consecutive_runs_interval = 30                                                                          # Opóźnienie pomiędzy kolejnymi wykonaniami skryptu w sekundach.
 upload_endpoint = https://pwdpb.spsm-sr.pse.pl/pwdp/pwdp-api/oze/schedule-request-files                 # Endpoint do upload'u plików
 oauth2_endpoint = https://sduext-sso.spsm-sr.pse.pl/auth/realms/SDU-EXT/protocol/openid-connect/token   # Endpoint do uwierzytelniania i autentykacji przy pomocy żetonów JWT.
 
@@ -32,8 +33,11 @@ source_path = C:/DEV/Projekty/PWDP/folder_z_xml                                 
 sent_dir_path = C:/DEV/Projekty/PWDP/folder_z_xml/sent                                                  # Ścieżka, w której przechowywane są pliki wysłane z powodzeniem.
 
 failed_dir_name = C:/DEV/Projekty/PWDP/folder_z_xml/failed                                              # Ścieżka, w której przechowywane są pliki których nie udało się przesłać. W folderze tym tworzone są również pliki informujące o błędach podczas próby wysłania.
-```
 
+[Proxy]
+proxy = http://jakiesproxy:0000                     # Proxy dla połączeń. W przypadku BRAKU PROXY WPISAĆ:
+proxy =
+```
 ## Uruchomienie
 
 Uruchomić plik main.py z poziomu katalogu projketu np.:
