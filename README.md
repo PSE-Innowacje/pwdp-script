@@ -16,8 +16,8 @@ Parametry:
 scanning_mode = one-time / loop                                                                         # Tryb wykonywania skryptu - na żadanie lub ciągły.
 delay_in_seconds = 2                                                                                    # Opóźnienie pomiędzy obsługą poszczególnych plików w sekundach. Opóźnienie to ma na celu mitygację konfliktów podczas obsługi plików o większych rozmiarach.
 consecutive_runs_interval = 30                                                                          # Opóźnienie pomiędzy kolejnymi wykonaniami skryptu w sekundach.
-upload_endpoint = https://pwdpb.spsm-sr.pse.pl/pwdp/pwdp-api/oze/schedule-request-files                 # Endpoint do upload'u plików
-oauth2_endpoint = https://sduext-sso.spsm-sr.pse.pl/auth/realms/SDU-EXT/protocol/openid-connect/token   # Endpoint do uwierzytelniania i autentykacji przy pomocy żetonów JWT.
+upload_endpoint = https://pwdp-st.pse.pl/pwdp/pwdp-api/oze/schedule-request-files
+oauth2_endpoint = https://auth.ppb-st.pse.pl/auth/realms/SDU-EXT-ST/protocol/openid-connect/token
 
 file_format = .xml                                                                                      # Rozszrzenie definiujące pliki, które mają być procesowane
 
@@ -25,17 +25,16 @@ file_format = .xml                                                              
 user = nazwa.uzytkownika@pse.pl                                                                         # Login dla użytkownika wykorzystywanego w procesie.
 secret = jakieshaslo!                                                                                   # Hasło dla użytkownika wykorzystywanego w procesie.
 permission = 10368                                                                                      # Numer uprawnień dla użytkownika. Odpowiedni numer pozwala wykorzystać 'upload_endpoint'.
-email_username = jakis.mail@pse.pl                                                                      # Adres email skrzynki, z której pobierane mają być pliki do późniejszej obsługi w skrypcie
-email_password = jakieshaslodoemaila                                                                    # Hasło do podanego powyżej adresu email
+email_username = jakis.mail@pse.pl                                                                      # Opcjonalny adres email skrzynki, z której pobierane mają być pliki do późniejszej obsługi w skrypcie. W przypadku potrzeby wyłączenia obsługi skrzynki email wpisać w polu email_username puste wartosci (email_username = ) lub usunac wpis z config.ini
+email_password = jakieshaslodoemaila                                                                    # Hasło do podanego powyżej adresu email, usunąć jeśli nie jest wykorzystywane.
 
 [Paths]
 source_path = C:/DEV/Projekty/PWDP/folder_z_xml                                                         # Ścieżka, w której znajdują się pliki '.xml' do wysłania. Do tej lokalizacji zapisywane są załączniki do uploadu ze skrzynki email
 sent_dir_path = C:/DEV/Projekty/PWDP/folder_z_xml/sent                                                  # Ścieżka, w której przechowywane są pliki wysłane z powodzeniem.
-
 failed_dir_name = C:/DEV/Projekty/PWDP/folder_z_xml/failed                                              # Ścieżka, w której przechowywane są pliki których nie udało się przesłać. W folderze tym tworzone są również pliki informujące o błędach podczas próby wysłania.
 
 [Proxy]
-proxy = http://jakiesproxy:0000                     # Proxy dla połączeń. W przypadku BRAKU PROXY WPISAĆ:
+proxy = http://jakiesproxy:0000                     # Proxy dla połączeń. W przypadku braku proxy usunąć wpis (należy pozostawić nagłówek [Proxy]!) lub wpisać:
 proxy =
 ```
 ## Uruchomienie
@@ -57,8 +56,8 @@ Przykładowe żądania:
 ```
 curl --insecure -d "grant_type=password" -d "client_id=frontend-ppb" \
 -d username={nazwa.uzytkownika@pse.pl} \
--d "password={jakieshaslo} \
-https://sduext-sso.spsm-sr.pse.pl/auth/realms/SDU-EXT/protocol/openid-connect/token
+-d "password={jakieshaslo}" \
+https://auth.ppb-st.pse.pl/auth/realms/SDU-EXT-ST/protocol/openid-connect/token
 ```
 
 gdzie:
@@ -84,9 +83,9 @@ Przykładowa odpowiedź to format JSON:
 ```
 curl --insecure --header 'Authorization: Bearer eyJHbG...' -- header 'Content-Type: application/x-www-form-urlencoded' \
 -d grant_type=urn:ietf:params:oauth:grant-type:uma-ticket \
--d 'audience: pwdp2,
+-d 'audience: pwdp2' \
 -d 'permission: {kod_uprawnień}' \
-https://sduext-sso.spsm-sr.pse.pl/auth/realms/SDU-EXT/protocol/openid-connect/token
+https://auth.ppb-st.pse.pl/auth/realms/SDU-EXT-ST/protocol/openid-connect/token
 ```
 
 gdzie:

@@ -43,13 +43,19 @@ class PWDPClient:
         self.user = config["Credentials"]["user"]
         self.secret = config["Credentials"]["secret"]
         self.permission = config["Credentials"]["permission"]
-        self.email_username = config["Credentials"]["email_username"]
-        self.email_password = config["Credentials"]["email_password"]
+        self.email_username = config["Credentials"].get("email_username")
+        self.email_password = config["Credentials"].get("email_password")
+        if self.email_username:
+            self.use_email = True
+        else:
+            self.use_email = False
+
         proxy = config["Proxy"].get("proxy")
         if proxy:
             self.proxy = {"http": proxy, "https": proxy}
         else:
             self.proxy = None
+
         self.refresh_token_expiration_time = None
         self.access_token = None
         self.refresh_token = None
@@ -171,28 +177,30 @@ class PWDPClient:
         By default use one specified in config.
         Sort output to ensure alphabetic processing.
         """
-        # Connect to email
-        try:
-            account = self._connect_to_email()
-            logger.info("Connected to EWS account.")
-        except ExchangeError as e:
-            logger.error(f"Error while connecting to Exchange account: {e}")
-            raise
-        # Refresh info about Account
-        try:
-            account.inbox.refresh()
-            logger.info("Refreshed Inbox.")
-        except ExchangeError as e:
-            logger.error(f"Unable to refresh Inbox - Unexpected error: {e}")
-            raise
 
         if file_format is None:
             file_format = self.file_format
 
-        try:
-            self.fetch_attachments_to_upload(file_format, account)
-        except ExchangeError as e:
-            logger.warning(f"Failed to fetch file(s) to upload: {e}")
+        # Use email if enabled
+        if self.use_email:
+            try:
+                account = self._connect_to_email()
+                logger.info("Connected to EWS account.")
+            except ExchangeError as e:
+                logger.error(f"Error while connecting to Exchange account: {e}")
+                raise
+            # Refresh info about Account
+            try:
+                account.inbox.refresh()
+                logger.info("Refreshed Inbox.")
+            except ExchangeError as e:
+                logger.error(f"Unable to refresh Inbox - Unexpected error: {e}")
+                raise
+
+            try:
+                self.fetch_attachments_to_upload(file_format, account)
+            except ExchangeError as e:
+                logger.warning(f"Failed to fetch file(s) to upload: {e}")
 
         files = glob.glob(pathname=f"*{file_format}", root_dir=self.source_path)
         if files:
