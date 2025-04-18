@@ -16,8 +16,8 @@ Parametry:
 scanning_mode = one-time / loop                                                                         # Tryb wykonywania skryptu - na żadanie lub ciągły.
 delay_in_seconds = 2                                                                                    # Opóźnienie pomiędzy obsługą poszczególnych plików w sekundach. Opóźnienie to ma na celu mitygację konfliktów podczas obsługi plików o większych rozmiarach.
 consecutive_runs_interval = 30                                                                          # Opóźnienie pomiędzy kolejnymi wykonaniami skryptu w sekundach.
-upload_endpoint = https://pwdp-st.pse.pl/pwdp/pwdp-api/oze/schedule-request-files
-oauth2_endpoint = https://auth.ppb-st.pse.pl/auth/realms/SDU-EXT-ST/protocol/openid-connect/token
+upload_endpoint = https://pwdp-st.pse.pl/pwdp/pwdp-api/oze/schedule-request-files                       # Endpoint do upload'u plików
+oauth2_endpoint = https://auth.ppb-st.pse.pl/auth/realms/SDU-EXT-ST/protocol/openid-connect/token       # Endpoint do uwierzytelniania i autentykacji przy pomocy żetonów JWT. Wykorzystywany jest do pobierania tokena (/token) oraz wylogowywania (/logout)
 
 file_format = .xml                                                                                      # Rozszrzenie definiujące pliki, które mają być procesowane
 

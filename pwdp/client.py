@@ -4,6 +4,7 @@ import logging
 import shutil
 import time
 from configparser import ConfigParser
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Self
 from zipfile import BadZipFile, ZipFile
@@ -66,11 +67,11 @@ class PWDPClient:
         logger.info("Config file loaded.")
         return PWDPClient(config)
 
-    def check_token_expiration_time(self, time_since_last_update: int) -> bool:
-        current_time = time.time()
-        return (
-            current_time - (time_since_last_update + self.refresh_token_expiration_time)
-            > -1800
+    def check_token_expiration_time(self, datetime_of_last_update: datetime) -> bool:
+        current_datetime = datetime.now()
+        return current_datetime > (
+            datetime_of_last_update
+            + timedelta(seconds=self.refresh_token_expiration_time / 2)
         )
 
     def setup_processing_directories(self) -> None:
@@ -85,19 +86,21 @@ class PWDPClient:
         self.upload_and_sort_files(files)
 
     def run_continuously(self) -> None:
-        time_since_last_token_update = time.time()
+        datetime_of_last_token_update = datetime.now()
         while True:
             self.run_once()
             time.sleep(self.consecutive_runs_interval)
-            if self.check_token_expiration_time(time_since_last_token_update):
+            if self.check_token_expiration_time(datetime_of_last_token_update):
+                logger.info("Token expiration time is due.")
                 self.refresh_rpt_tokens()
-                time_since_last_token_update = time.time()
+                datetime_of_last_token_update = datetime.now()
 
     def run(self) -> None:
         self.setup_processing_directories()
         self.authenticate()
         if self.scanning_mode == "one-time":
             self.run_once()
+            self.logout()
         elif self.scanning_mode == "loop":
             self.run_continuously()
         else:
@@ -238,7 +241,7 @@ class PWDPClient:
     def _request_initial_tokens(self) -> tuple[str, str]:
         logger.info(f"Requesting inital tokens from {self.oauth2_endpoint} ...")
         response = requests.post(
-            url=self.oauth2_endpoint,
+            url=f"{self.oauth2_endpoint}",
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             data={
                 "client_id": "frontend-ppb",
@@ -262,7 +265,7 @@ class PWDPClient:
         "Obtain requesting party token (RPT) in the UMA protocol"
         logger.info(f"Requesting RPT tokens from {self.oauth2_endpoint} ...")
         response = requests.post(
-            url=self.oauth2_endpoint,
+            url=f"{self.oauth2_endpoint}",
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Authorization": f"Bearer {initial_access_token}",
@@ -297,10 +300,31 @@ class PWDPClient:
         self.refresh_token = rpt_refresh_token
         self.refresh_token_expiration_time = rpt_expiration_time
 
+    def logout(self):
+        logger.info("Logging out...")
+        response = requests.post(
+            url=f"{self.oauth2_endpoint}".replace("token", "logout"),
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": "Bearer " + self.access_token,
+            },
+            data={
+                "client_id": "frontend-ppb",
+                "refresh_token": self.refresh_token,
+            },
+            verify=True,
+            timeout=(5, 5),
+            proxies=self.proxy,
+        )
+        if response.ok:
+            logger.info("Logged out successfully.")
+        else:
+            logger.warning("Failed to logout. Session will expire automatically.")
+
     def refresh_rpt_tokens(self) -> None:
         logger.info("Refreshing RPT token...")
         response = requests.post(
-            self.oauth2_endpoint,
+            f"{self.oauth2_endpoint}",
             data={
                 "client_id": "frontend-ppb",
                 "refresh_token": self.refresh_token,
@@ -314,6 +338,12 @@ class PWDPClient:
             timeout=(5, 5),
             proxies=self.proxy,
         )
+        if not response.ok:
+            logger.warning(
+                "RPT Token refresh has failed. Attempting to establish new session."
+            )
+            self.authenticate()
+            return
         (
             access_token,
             refresh_token,
