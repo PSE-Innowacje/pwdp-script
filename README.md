@@ -1,6 +1,6 @@
 ## Licencja
 
-Ten projekt jest udostępniony na licencji MIT. Szczegóły znajdziesz w pliku [LICENSE](./LICENSE.txt).
+Ten projekt jest udostępniony na licencji MIT. Szczegóły znajdziesz w pliku [LICENSE](./LICENSE).
 
 ## Ogólne informacje
 
