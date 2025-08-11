@@ -1,3 +1,6 @@
+# Copyright (c) 2024 by PSE Innowacje sp. z o.o.
+# This file is licensed under the MIT License.
+# See the LICENSE file in the project root for full license information.
 import logging
 import os
 import sys

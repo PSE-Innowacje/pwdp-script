@@ -1,3 +1,7 @@
+## Licencja
+
+Ten projekt jest udostępniony na licencji MIT. Szczegóły znajdziesz w pliku [LICENSE](./LICENSE.txt).
+
 ## Ogólne informacje
 
 Skrypt służy do przesyłania plików '.xml' przy pomocy interfejsu API i ich odpowiedniej segregacji w zależności od statusu żądania.
